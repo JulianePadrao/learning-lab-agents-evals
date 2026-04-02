@@ -1,0 +1,175 @@
+name: Update Changelog
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  models: read
+  pull-requests: read
+
+jobs:
+  # ── Test mode: verify GitHub Models connectivity ──
+  test-connection:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Test GitHub Models connection
+        uses: actions/github-script@v7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          script: |
+            core.info('Testing GitHub Models connectivity...');
+
+            const response = await fetch('https://models.github.ai/inference/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: 'openai/gpt-4o-mini',
+                messages: [
+                  { role: 'user', content: 'Reply with exactly: CONNECTION_OK' },
+                ],
+                max_tokens: 10,
+              }),
+            });
+
+            if (!response.ok) {
+              const body = await response.text();
+              core.setFailed(`GitHub Models API returned ${response.status}: ${body}`);
+              return;
+            }
+
+            const result = await response.json();
+            const reply = result.choices?.[0]?.message?.content?.trim() || '';
+            core.info(`Model responded: ${reply}`);
+            core.info('GitHub Models connection is working.');
+
+  # ── Production mode: update changelog on merged PR ──
+  update-changelog:
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Summarize PR changes with Copilot
+        id: summarize
+        uses: actions/github-script@v7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+
+            // Fetch the list of changed files with patches
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+            });
+
+            const diff = files
+              .map(f => `File: ${f.filename} (${f.status})\n${f.patch || '(binary)'}`)
+              .join('\n\n');
+
+            // Truncate diff to stay within token limits
+            const truncatedDiff = diff.substring(0, 8000);
+
+            // Call GitHub Models to generate a summary
+            const response = await fetch('https://models.github.ai/inference/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: 'openai/gpt-4o-mini',
+                messages: [
+                  {
+                    role: 'system',
+                    content:
+                      'You are a concise changelog writer. Given a pull request title, description, and diff, write a single clear sentence summarizing what changed. Focus on the user-visible impact. Do not include PR numbers, author names, or markdown formatting.',
+                  },
+                  {
+                    role: 'user',
+                    content: `PR Title: ${pr.title}\nPR Description: ${pr.body || 'No description provided.'}\n\nDiff:\n${truncatedDiff}`,
+                  },
+                ],
+                max_tokens: 150,
+              }),
+            });
+
+            if (!response.ok) {
+              core.warning(`GitHub Models API returned ${response.status}; falling back to PR title.`);
+              core.setOutput('summary', '');
+              return;
+            }
+
+            const result = await response.json();
+            const summary = result.choices?.[0]?.message?.content?.trim() || '';
+            core.setOutput('summary', summary);
+
+      - name: Update CHANGELOG.md
+        uses: actions/github-script@v7
+        env:
+          AI_SUMMARY: ${{ steps.summarize.outputs.summary }}
+        with:
+          script: |
+            const fs = require('fs');
+            const pr = context.payload.pull_request;
+
+            const date = new Date().toISOString().split('T')[0];
+            const title = pr.title.replace(/[<>&"'`]/g, '');
+            const number = pr.number;
+            const author = pr.user.login;
+            const url = pr.html_url;
+            const labels = pr.labels.map(l => l.name);
+
+            // Use AI summary if available, otherwise fall back to PR title
+            const aiSummary = process.env.AI_SUMMARY || '';
+            const description = aiSummary || title;
+
+            // Determine category from PR labels
+            let category = 'Other';
+            if (labels.some(l => /break/i.test(l))) category = 'Breaking Changes';
+            else if (labels.some(l => /feat|enhancement/i.test(l))) category = 'Features';
+            else if (labels.some(l => /fix|bug/i.test(l))) category = 'Bug Fixes';
+            else if (labels.some(l => /doc/i.test(l))) category = 'Documentation';
+            else if (labels.some(l => /chore|maint/i.test(l))) category = 'Maintenance';
+
+            const entry = `## ${date}\n\n### ${category}\n\n- ${description} ([#${number}](${url})) by @${author}\n`;
+
+            const changelogPath = 'CHANGELOG.md';
+            let existing = '';
+            if (fs.existsSync(changelogPath)) {
+              existing = fs.readFileSync(changelogPath, 'utf8');
+            }
+
+            const header = '# Changelog\n\n';
+            const body = existing.startsWith('# Changelog')
+              ? existing.replace(/^# Changelog\n\n/, '')
+              : existing;
+
+            fs.writeFileSync(changelogPath, `${header}${entry}\n${body}`);
+            core.info(`Added changelog entry for PR #${number}`);
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          git commit -m "docs: update changelog for PR #${{ github.event.pull_request.number }}"
+          git push
