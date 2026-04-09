@@ -3,18 +3,22 @@ name: Run Evaluation
 on:
   workflow_dispatch:
     inputs:
-      test_file:
-        description: "Path to test JSONL (e.g. evaluation/data/technical-accuracy-tests/smoke-test.jsonl)"
-        required: true
-        default: "evaluation/data/technical-accuracy-tests/smoke-test.jsonl"
       agent_file:
-        description: "Path to agent definition (e.g. agents/learn-unit-writer.agent.md)"
-        required: true
+        description: "Agent to evaluate (e.g. agents/learn-module-writer.agent.md). Ignored when run_all is true."
+        required: false
         default: "agents/learn-unit-writer.agent.md"
-      results_file:
-        description: "Path to write results JSONL (e.g. evaluation/data/technical-accuracy-results/smoke-test-results.jsonl)"
-        required: true
-        default: "evaluation/data/technical-accuracy-results/smoke-test-results.jsonl"
+      test_file:
+        description: "Path to test JSONL"
+        required: false
+        default: "evaluation/data/technical-accuracy-tests/smoke-test.jsonl"
+      run_all:
+        description: "Evaluate ALL agents in agents/ folder"
+        type: boolean
+        default: false
+      run_foundry:
+        description: "Upload results to Azure AI Foundry for cloud evaluation"
+        type: boolean
+        default: false
 
 jobs:
   evaluate:
@@ -22,7 +26,7 @@ jobs:
 
     permissions:
       contents: write
-      models: read
+      id-token: write
 
     steps:
       - name: Checkout
@@ -34,26 +38,84 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install openai
+        run: pip install -r requirements.txt
 
-      - name: Generate responses
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # --- Single agent mode ---
+      - name: Generate responses (single agent)
+        if: ${{ github.event.inputs.run_all != 'true' }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FOUNDRY_PROJECT_ENDPOINT: ${{ secrets.FOUNDRY_PROJECT_ENDPOINT }}
+          MODEL_NAME: ${{ vars.MODEL_NAME || 'gpt-4.1' }}
           TEST_FILE: ${{ github.event.inputs.test_file }}
           AGENT_FILE: ${{ github.event.inputs.agent_file }}
-          RESULTS_FILE: ${{ github.event.inputs.results_file }}
-        run: python evaluation/scripts/run_eval.py
+        run: |
+          AGENT_NAME=$(basename "$AGENT_FILE" .agent.md)
+          export RESULTS_FILE="evaluation/data/technical-accuracy-results/smoke-test-results-${AGENT_NAME}.jsonl"
+          python evaluation/scripts/run_eval.py
+          echo "RESULTS_FILE=${RESULTS_FILE}" >> "$GITHUB_ENV"
 
-      - name: Compare responses to ground truth
+      - name: Score responses (single agent)
+        if: ${{ github.event.inputs.run_all != 'true' }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RESULTS_FILE: ${{ github.event.inputs.results_file }}
+          FOUNDRY_PROJECT_ENDPOINT: ${{ secrets.FOUNDRY_PROJECT_ENDPOINT }}
+          MODEL_NAME: ${{ vars.MODEL_NAME || 'gpt-4.1' }}
+          RESULTS_FILE: ${{ env.RESULTS_FILE }}
         run: python evaluation/scripts/compare.py
 
+      # --- Batch mode: all agents ---
+      - name: Evaluate all agents
+        if: ${{ github.event.inputs.run_all == 'true' }}
+        env:
+          FOUNDRY_PROJECT_ENDPOINT: ${{ secrets.FOUNDRY_PROJECT_ENDPOINT }}
+          MODEL_NAME: ${{ vars.MODEL_NAME || 'gpt-4.1' }}
+          TEST_FILE: ${{ github.event.inputs.test_file }}
+        run: |
+          FAILED=0
+          for AGENT_FILE in agents/*.agent.md; do
+            AGENT_NAME=$(basename "$AGENT_FILE" .agent.md)
+
+            # Skip the evaluation runner itself
+            if [ "$AGENT_NAME" = "evaluation-runner" ]; then
+              echo "Skipping evaluation-runner"
+              continue
+            fi
+
+            echo ""
+            echo "=========================================="
+            echo "Evaluating: $AGENT_NAME"
+            echo "=========================================="
+
+            export AGENT_FILE
+            export RESULTS_FILE="evaluation/data/technical-accuracy-results/smoke-test-results-${AGENT_NAME}.jsonl"
+
+            python evaluation/scripts/run_eval.py
+            python evaluation/scripts/compare.py || FAILED=1
+          done
+
+          if [ "$FAILED" -eq 1 ]; then
+            echo "::warning::One or more agents failed the evaluation threshold."
+          fi
+
+      # --- Commit results ---
       - name: Commit results
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add ${{ github.event.inputs.results_file }} reports/
+          git add evaluation/data/technical-accuracy-results/ reports/
           git diff --cached --quiet || git commit -m "chore: add evaluation results [skip ci]"
           git push
+
+      # --- Optional: Foundry cloud evaluation ---
+      - name: Run Foundry cloud evaluation
+        if: ${{ github.event.inputs.run_foundry == 'true' }}
+        env:
+          FOUNDRY_PROJECT_ENDPOINT: ${{ secrets.FOUNDRY_PROJECT_ENDPOINT }}
+          MODEL_NAME: ${{ vars.MODEL_NAME || 'gpt-4.1' }}
+        run: python evaluation/scripts/evaluate_agent.py

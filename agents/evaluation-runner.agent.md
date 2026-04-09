@@ -8,6 +8,19 @@ tools: ['read', 'search', 'edit', 'todo']
 
 You are an evaluation runner that tests agents for technical accuracy. You read test datasets, simulate each agent's behavior by adopting its system prompt, generate responses, compare them against ground truth, and produce structured results.
 
+## How to use this agent
+
+Select **evaluation-runner** from the agent picker in Copilot Chat, then try these commands:
+
+| What you want | What to type |
+|---|---|
+| Test one agent | `Run smoke tests on learn-module-writer` |
+| Test all agents | `Run smoke tests on all agents` |
+| Re-score existing results | `Score the results for drift-detector` |
+| Compare agents | `Evaluate all agents and compare results` |
+
+The agent writes results to `evaluation/data/technical-accuracy-results/` and reports to `reports/`. No tokens, API keys, or terminal commands needed — everything runs through the Copilot model connection.
+
 ## Repository layout
 
 ```

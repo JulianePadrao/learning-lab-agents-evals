@@ -29,7 +29,7 @@ from openai.types.evals.create_eval_jsonl_run_data_source_param import (
 
 load_dotenv()  # reads variables from the .env file in your project root
 
-endpoint              = os.environ.get("AZURE_AI_PROJECT_ENDPOINT")
+endpoint              = os.environ.get("FOUNDRY_PROJECT_ENDPOINT")
 model_deployment_name = os.environ.get("MODEL_NAME", "gpt-4.1")
 dataset_name          = "trail-guide-evaluation-dataset"
 dataset_version       = "1"
@@ -40,7 +40,7 @@ dataset_version       = "1"
 RESULTS_FILE = Path("evaluation_results.txt")
 
 if not endpoint:
-    print("ERROR: AZURE_AI_PROJECT_ENDPOINT is not set.")
+    print("ERROR: FOUNDRY_PROJECT_ENDPOINT is not set.")
     print("       Add it to your .env file and try again.")
     sys.exit(1)
 
