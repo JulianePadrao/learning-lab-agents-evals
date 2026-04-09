@@ -75,7 +75,7 @@ jobs:
             
             </details>
             
-            📊 [View full results in Azure AI Foundry Portal](${reportUrl})
+            📊 [View full results in Microsoft Foundry Portal](${reportUrl})
             
             **Evaluation Criteria:**
             - Intent Resolution (score ≥ 3)

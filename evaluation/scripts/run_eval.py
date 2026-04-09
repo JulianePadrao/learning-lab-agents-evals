@@ -2,11 +2,11 @@
 Generate agent responses for a smoke-test evaluation.
 
 Reads an agent .agent.md file, extracts its system prompt, sends each query
-through an Azure AI Foundry model deployment, and writes a results JSONL with
+through a Microsoft Foundry model deployment, and writes a results JSONL with
 query + response + ground_truth.
 
 Environment variables:
-    FOUNDRY_PROJECT_ENDPOINT – Azure AI Foundry project endpoint
+    FOUNDRY_PROJECT_ENDPOINT – Microsoft Foundry project endpoint
     AGENT_FILE               – path to the agent .agent.md file
     TEST_FILE                – path to the test JSONL file
     RESULTS_FILE             – path to write the results JSONL

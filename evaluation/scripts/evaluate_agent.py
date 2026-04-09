@@ -48,7 +48,7 @@ if not endpoint:
 # Azure clients
 # ---------------------------------------------------------------------------
 
-# AIProjectClient connects to your Azure AI Foundry project
+# AIProjectClient connects to your Microsoft Foundry project
 project_client = AIProjectClient(
     endpoint=endpoint,
     credential=DefaultAzureCredential(),
@@ -75,7 +75,7 @@ def section(title: str) -> None:
 
 def upload_dataset() -> str:
     """
-    Upload the JSONL evaluation dataset to Azure AI Foundry and return its ID.
+    Upload the JSONL evaluation dataset to Microsoft Foundry and return its ID.
 
     The dataset is a list of JSON objects, each containing:
       - query        : the user question sent to the agent
@@ -271,7 +271,7 @@ def poll_for_results(eval_object, eval_run):
                 f"  Eval ID : {eval_object.id}\n"
                 f"  Run ID  : {eval_run.id}\n"
                 f"  Error   : {error_detail}\n"
-                f"  To inspect: open Azure AI Foundry portal > Evaluations"
+                f"  To inspect: open Microsoft Foundry portal > Evaluations"
             )
         else:
             # Overwrite the same line so the terminal isn't flooded
@@ -322,7 +322,7 @@ def retrieve_and_display_results(eval_object, run):
     if errored_items:
         print(f"\n  ⚠ {len(errored_items)} item(s) errored during evaluation.")
         print(f"    First error: {getattr(errored_items[0], 'error', 'details unavailable')}")
-        print(f"    Open Azure AI Foundry portal > Evaluations to inspect all failed items.")
+        print(f"    Open Microsoft Foundry portal > Evaluations to inspect all failed items.")
 
     # Collect individual scores grouped by metric name
     scores: dict[str, list[float]] = {
@@ -374,7 +374,7 @@ def retrieve_and_display_results(eval_object, run):
     if not any_scores:
         # Scores missing — the evaluation may have completed but returned no
         # evaluator_outputs. Open the Report URL above to inspect in the portal.
-        lines.append("  No scores returned — open Azure AI Foundry portal > Evaluations for details.")
+        lines.append("  No scores returned — open Microsoft Foundry portal > Evaluations for details.")
         pass_lines.append("  No scores returned.")
 
     lines.extend(pass_lines)
@@ -421,7 +421,7 @@ def main() -> None:
 
         section("Cloud evaluation complete")
         print(f"\nNext steps:")
-        print(f"  1. Review detailed results in Azure AI Foundry portal")
+        print(f"  1. Review detailed results in Microsoft Foundry portal")
         print(f"  2. Analyze patterns in successful and failed evaluations")
         print(f"  3. Commit {RESULTS_FILE} and push so the PR workflow can use it")
 

@@ -5,7 +5,7 @@ Reads a results JSONL (query + response + ground_truth), scores each item
 on accuracy, completeness, and tone, and writes a markdown report.
 
 Environment variables:
-    FOUNDRY_PROJECT_ENDPOINT – Azure AI Foundry project endpoint
+    FOUNDRY_PROJECT_ENDPOINT – Microsoft Foundry project endpoint
     RESULTS_FILE             – path to the results JSONL to score
     MODEL_NAME               – (optional) deployed model name, default: gpt-4.1
 

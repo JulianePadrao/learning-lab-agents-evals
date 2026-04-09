@@ -16,7 +16,7 @@ on:
         type: boolean
         default: false
       run_foundry:
-        description: "Upload results to Azure AI Foundry for cloud evaluation"
+        description: "Upload results to Microsoft Foundry for cloud evaluation"
         type: boolean
         default: false
 
