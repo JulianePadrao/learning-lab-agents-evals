@@ -1,0 +1,1 @@
+{"query":"What platform should developers use to build and deploy AI agents on Azure?","response":"To build and deploy AI agents on Azure, developers should use Microsoft Foundry. It integrates with Azure AI Services and provides tools for agent orchestration.","ground_truth":"Developers should use Microsoft Foundry to build, evaluate, and deploy AI agents on Azure."}

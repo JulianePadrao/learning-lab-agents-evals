@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Human Evaluation</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #1a1a1a; height: 100vh; display: flex; flex-direction: column; }
+
+    /* ---- Top bar ---- */
+    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; background: #fff; border-bottom: 1px solid #e5e5e5; min-height: 48px; flex-shrink: 0; }
+    .topbar-left { display: flex; align-items: center; gap: 16px; }
+    .topbar-left .agent-name { font-size: 14px; font-weight: 600; color: #1a1a1a; }
+    .topbar-right { display: flex; align-items: center; gap: 16px; font-size: 13px; color: #666; }
+    .topbar-right .eval-meta { background: #f3f0ff; padding: 4px 12px; border-radius: 12px; font-size: 12px; color: #7c3aed; font-weight: 500; }
+
+    /* ---- Login page ---- */
+    .login-container { max-width: 420px; margin: 100px auto; background: #fff; border-radius: 16px; padding: 44px; box-shadow: 0 1px 8px rgba(0,0,0,0.06); text-align: center; }
+    .login-container h1 { font-size: 22px; margin-bottom: 8px; font-weight: 700; }
+    .login-container p { color: #666; margin-bottom: 28px; font-size: 14px; line-height: 1.5; }
+    .login-container input[type="text"] { width: 100%; padding: 12px 16px; border: 1px solid #d0d0d0; border-radius: 10px; font-size: 15px; outline: none; }
+    .login-container input[type="text"]:focus { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,0.1); }
+    .login-container select { width: 100%; padding: 12px 16px; border: 1px solid #d0d0d0; border-radius: 10px; font-size: 15px; margin-top: 12px; outline: none; background: #fff; appearance: auto; }
+    .login-container select:focus { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,0.1); }
+    .login-container button { margin-top: 20px; width: 100%; padding: 12px; background: #1a1a1a; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; }
+    .login-container button:hover { background: #333; }
+    .login-error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 10px; padding: 12px 16px; margin-bottom: 20px; font-size: 13px; text-align: left; }
+
+    /* ---- Main layout (3 columns) ---- */
+    .main { flex: 1; display: flex; overflow: hidden; position: relative; }
+
+    /* ---- Left question pane (floating overlay) ---- */
+    .question-pane { width: 340px; background: #fafafa; display: flex; flex-direction: column; position: absolute; left: 0; top: 0; bottom: 0; z-index: 10; box-shadow: 2px 0 12px rgba(0,0,0,0.06); }
+    .question-pane-header { padding: 16px 16px 12px; font-size: 12px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e5e5e5; }
+    .question-list { flex: 1; overflow-y: auto; }
+    .question-item { display: flex; align-items: flex-start; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #f0f0f0; cursor: pointer; text-decoration: none; color: inherit; transition: background 0.15s; }
+    .question-item:hover { background: #f0f0f0; }
+    .question-item.active { background: #ede9fe; }
+    .question-status { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; font-size: 13px; font-weight: 700; }
+    .question-status.pending { border: 2px solid #d0d0d0; color: transparent; }
+    .question-status.graded { background: #10b981; color: #fff; font-size: 12px; }
+    .question-status.skipped { background: #9ca3af; color: #fff; font-size: 16px; line-height: 1; }
+    .question-num { font-size: 12px; font-weight: 600; color: #888; min-width: 20px; }
+    .question-text { font-size: 13px; color: #555; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .question-pane-footer { padding: 12px 16px; border-top: 1px solid #e5e5e5; font-size: 12px; color: #888; display: flex; gap: 12px; }
+    .question-pane-footer span { display: flex; align-items: center; gap: 4px; }
+    .question-pane-submit { padding: 12px 16px; border-top: 1px solid #e5e5e5; background: #fafafa; }
+    .btn-submit { width: 100%; padding: 11px; background: #10b981; color: #fff; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .btn-submit:hover { background: #059669; }
+    .btn-submit:disabled { background: #d1d5db; color: #9ca3af; cursor: not-allowed; }
+
+    /* ---- Chat panel ---- */
+    .chat-panel { flex: 1; display: flex; flex-direction: column; background: #fff; min-width: 0; }
+    .chat-messages { flex: 1; overflow-y: auto; padding: 28px 80px 20px 80px; max-width: 820px; margin: 0 auto; width: 100%; }
+    .user-msg { text-align: right; margin-bottom: 28px; padding-right: 4px; }
+    .user-msg span { font-size: 14px; color: #1a1a1a; }
+    .agent-msg { margin-bottom: 20px; }
+    .agent-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .agent-icon { width: 28px; height: 28px; border-radius: 50%; background: #9ca3af; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .agent-icon svg { width: 16px; height: 16px; fill: #fff; }
+    .agent-label { font-size: 14px; font-weight: 600; color: #1a1a1a; }
+    .agent-body { font-size: 14px; line-height: 1.75; color: #333; padding-left: 38px; }
+    .agent-body p { margin-bottom: 12px; }
+    .agent-body ul, .agent-body ol { margin: 6px 0 12px 20px; }
+    .agent-body li { margin-bottom: 4px; }
+    .agent-body strong { font-weight: 600; }
+
+    .chat-bottom { padding: 12px 80px; background: #f9f9f9; max-width: 820px; margin: 0 auto; width: 100%; }
+    .chat-input-row { display: flex; align-items: center; background: #fff; border: 1px solid #e0e0e0; border-radius: 24px; padding: 4px 4px 4px 20px; }
+    .chat-input-row .fake-input { flex: 1; font-size: 14px; color: #aaa; padding: 8px 0; }
+    .chat-input-row .send-btn { width: 36px; height: 36px; border-radius: 50%; background: #e5e5e5; border: none; display: flex; align-items: center; justify-content: center; cursor: default; flex-shrink: 0; }
+    .chat-input-row .send-btn svg { width: 18px; height: 18px; fill: #999; transform: rotate(-45deg); }
+    .chat-bottom-hint { text-align: center; font-size: 11px; color: #aaa; padding: 6px 0; background: #f9f9f9; }
+
+    /* ---- Grading sidebar ---- */
+    .sidebar { width: 340px; background: #fafafa; border-left: 1px solid #e5e5e5; display: flex; flex-direction: column; overflow-y: auto; position: absolute; right: 0; top: 0; bottom: 0; z-index: 10; box-shadow: -2px 0 12px rgba(0,0,0,0.06); }
+    .sidebar-inner { padding: 24px 20px; flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
+    .sidebar h2 { font-size: 20px; font-weight: 700; margin-bottom: 20px; color: #1a1a1a; }
+    .grade-card { background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; padding: 16px 14px; margin-bottom: 12px; }
+    .grade-card label { font-size: 13px; color: #555; font-weight: 500; display: block; margin-bottom: 10px; line-height: 1.4; }
+    .slider-row { display: flex; align-items: center; gap: 8px; }
+    .slider-row input[type="range"] { flex: 1; accent-color: #7c3aed; height: 6px; }
+    .slider-label { font-size: 11px; color: #999; min-width: 24px; text-align: center; }
+    .grade-card textarea { width: 100%; min-height: 48px; padding: 10px 12px; border: none; font-size: 14px; resize: vertical; outline: none; font-family: inherit; color: #1a1a1a; background: transparent; }
+    .grade-card textarea::placeholder { color: #aaa; }
+    .sidebar-actions { padding: 16px 20px; border-top: 1px solid #e5e5e5; display: flex; gap: 10px; justify-content: flex-end; background: #fafafa; }
+    .btn { padding: 9px 22px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; }
+    .btn-skip { background: #fff; border: 1px solid #d0d0d0; color: #333; }
+    .btn-skip:hover { background: #f5f5f5; }
+    .btn-save { background: #7c3aed; color: #fff; border-radius: 20px; padding: 9px 28px; }
+    .btn-save:hover { background: #6d28d9; }
+
+    /* Thumbs toggle */
+    .thumbs-row { display: flex; gap: 10px; }
+    .thumb-btn { width: 44px; height: 44px; border-radius: 10px; border: 2px solid #e5e5e5; background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+    .thumb-btn svg { width: 22px; height: 22px; fill: #bbb; transition: fill 0.15s; }
+    .thumb-btn.selected-yes { border-color: #10b981; background: #ecfdf5; }
+    .thumb-btn.selected-yes svg { fill: #10b981; }
+    .thumb-btn.selected-no { border-color: #ef4444; background: #fef2f2; }
+    .thumb-btn.selected-no svg { fill: #ef4444; }
+    .thumb-btn:hover { border-color: #aaa; }
+
+    /* Revisit badge */
+    .revisit-badge { display: inline-block; background: #fef3c7; color: #92400e; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 10px; margin-bottom: 16px; }
+
+    /* Info icon + popup */
+    .info-icon { cursor: pointer; display: flex; align-items: center; position: relative; }
+    .info-icon:hover svg { fill: #7c3aed; }
+    .info-popup { display: none; position: absolute; top: 30px; left: 0; background: #fff; border: 1px solid #e5e5e5; border-radius: 10px; padding: 14px 16px; font-size: 13px; font-weight: 400; color: #555; line-height: 1.5; width: 260px; box-shadow: 0 4px 16px rgba(0,0,0,0.1); z-index: 20; }
+    .info-popup.visible { display: block; }
+
+    /* ---- Done page ---- */
+    .done-container { max-width: 500px; margin: 100px auto; background: #fff; border-radius: 16px; padding: 48px; box-shadow: 0 1px 8px rgba(0,0,0,0.06); text-align: center; }
+    .done-container h1 { font-size: 24px; margin-bottom: 12px; }
+    .done-container p { color: #555; font-size: 14px; margin-bottom: 8px; }
+    .done-container code { display: block; margin-top: 16px; background: #f3f0ff; padding: 12px; border-radius: 8px; font-size: 13px; word-break: break-all; }
+    .done-container .restart-btn { display: inline-block; margin-top: 24px; padding: 12px 28px; background: #1a1a1a; color: #fff; border-radius: 10px; font-size: 15px; font-weight: 600; text-decoration: none; }
+    .done-container .restart-btn:hover { background: #333; }
+  </style>
+</head>
+<body>
+
+{% if page == "login" %}
+<!-- ==================== LOGIN ==================== -->
+<div class="login-container">
+  <h1>Human Evaluation</h1>
+  <p>Grade agent responses to evaluation prompts.<br>Your scores will be saved to a CSV file.</p>
+  {% if error %}
+  <div class="login-error">{{ error }}</div>
+  {% endif %}
+  <form method="POST" action="/">
+    <input type="text" name="name" placeholder="Enter your name" required autofocus>
+    <select name="agent_file">
+      <option value="">No agent (base model only)</option>
+      {% for agent in agents %}
+      <option value="{{ agent.filename }}">{{ agent.display_name }}</option>
+      {% endfor %}
+    </select>
+    <select name="role" required>
+      <option value="" disabled selected>Select your role</option>
+      <option value="Developer">Developer</option>
+      <option value="IT pro">IT pro</option>
+      <option value="Business user">Business user</option>
+    </select>
+    <button type="submit">Start Evaluating</button>
+  </form>
+</div>
+
+{% elif page == "evaluate" %}
+<!-- ==================== EVALUATE ==================== -->
+<div class="topbar">
+  <div class="topbar-left">
+    <span class="agent-name">{{ agent_name }}</span>
+  </div>
+  <div class="topbar-right">
+    <span>{{ evaluator }}</span>
+    <span class="eval-meta">{{ graded_count }} graded · {{ skipped_count }} skipped / {{ total }}</span>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left question pane -->
+  <div class="question-pane">
+    <div class="question-pane-header">Questions</div>
+    <div class="question-list">
+      {% for q in questions %}
+      <a href="/evaluate?q={{ q.index }}" class="question-item {{ 'active' if q.active else '' }}">
+        <div class="question-status {{ q.status }}">
+          {% if q.status == 'graded' %}✓{% elif q.status == 'skipped' %}–{% endif %}
+        </div>
+        <div>
+          <div class="question-num">Q{{ q.index + 1 }}</div>
+          <div class="question-text">{{ q.query }}</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    <div class="question-pane-footer">
+      <span>✓ {{ graded_count }} graded</span>
+      <span>– {{ skipped_count }} skipped</span>
+      <span>○ {{ total - graded_count - skipped_count }} remaining</span>
+    </div>
+    <div class="question-pane-submit">
+      {% set remaining = total - graded_count - skipped_count %}
+      <a href="/done" class="btn-submit" style="display:block;text-align:center;text-decoration:none;">
+        Submit Evaluation
+      </a>
+      {% if remaining > 0 %}
+      <div style="text-align:center;font-size:11px;color:#aaa;margin-top:6px;">{{ remaining }} unanswered will be skipped</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Chat area -->
+  <div class="chat-panel">
+    <div class="chat-messages">
+      <div class="user-msg"><span>{{ query }}</span></div>
+      <div class="agent-msg">
+        <div class="agent-header">
+          <div class="agent-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+          </div>
+          <span class="agent-label">{{ agent_name }}</span>
+        </div>
+        <div class="agent-body" id="response-body"></div>
+      </div>
+    </div>
+    <div class="chat-bottom">
+      <div class="chat-input-row">
+        <div class="fake-input">Message the agent...</div>
+        <div class="send-btn">
+          <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </div>
+      </div>
+    </div>
+    <div class="chat-bottom-hint">AI-generated content may be incorrect</div>
+  </div>
+
+  <!-- Grading sidebar -->
+  <div class="sidebar">
+    <div style="display:flex;flex-direction:column;height:100%;">
+      <div class="sidebar-inner">
+        <h2 style="display:flex;align-items:center;gap:8px;">human-eval
+          <span class="info-icon" onclick="this.parentElement.querySelector('.info-popup').classList.toggle('visible')" title="Info">
+            <svg viewBox="0 0 20 20" width="18" height="18" fill="#aaa"><path d="M10 0C4.48 0 0 4.48 0 10s4.48 10 10 10 10-4.48 10-10S15.52 0 10 0zm1 15H9V9h2v6zm0-8H9V5h2v2z"/></svg>
+          </span>
+          <div class="info-popup">This is my info</div>
+        </h2>
+
+        {% if existing_status != 'pending' %}
+        <div class="revisit-badge">
+          {% if existing_status == 'graded' %}✓ Previously graded — update below{% elif existing_status == 'skipped' %}– Previously skipped — grade or skip again{% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Factual Accuracy (thumbs up/down) -->
+        <div class="grade-card">
+          <label>Is this response factually accurate?</label>
+          <input type="hidden" name="factual_accuracy" id="factual-input" value="{{ existing.get('factual_accuracy', '') }}" form="grade-form">
+          <div class="thumbs-row">
+            <button type="button" class="thumb-btn {{ 'selected-yes' if existing.get('factual_accuracy') == 'yes' else '' }}" onclick="setFactual('yes')" title="Yes">
+              <svg viewBox="0 0 24 24"><path d="M2 20h2V8H2v12zm20-11a2 2 0 00-2-2h-6.31l.95-4.57.03-.32a1.49 1.49 0 00-.44-1.06L13.17 0 6.59 6.59C6.22 6.95 6 7.45 6 8v10a2 2 0 002 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/></svg>
+            </button>
+            <button type="button" class="thumb-btn {{ 'selected-no' if existing.get('factual_accuracy') == 'no' else '' }}" onclick="setFactual('no')" title="No">
+              <svg viewBox="0 0 24 24"><path d="M22 4h-2v12h2V4zM2.17 15a2 2 0 002 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L10.83 24l6.58-6.59c.37-.36.59-.86.59-1.41V6a2 2 0 00-2-2H7c-.83 0-1.54.5-1.84 1.22L2.14 12.27c-.09.23-.14.47-.14.73v2z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Appropriate Level (3-point) -->
+        <div class="grade-card">
+          <label>Appropriate level for learner</label>
+          <div class="slider-row">
+            <span class="slider-label">1</span>
+            <input type="range" name="appropriate_level" min="1" max="3" value="{{ existing.get('appropriate_level') or 2 }}" step="1" form="grade-form">
+            <span class="slider-label">3</span>
+          </div>
+        </div>
+
+        <!-- Logical Progression (3-point) -->
+        <div class="grade-card">
+          <label>Logical progression of ideas</label>
+          <div class="slider-row">
+            <span class="slider-label">1</span>
+            <input type="range" name="logical_progression" min="1" max="3" value="{{ existing.get('logical_progression') or 2 }}" step="1" form="grade-form">
+            <span class="slider-label">3</span>
+          </div>
+        </div>
+
+        <!-- Helpfulness (3-point) -->
+        <div class="grade-card">
+          <label>Helpfulness for learning</label>
+          <div class="slider-row">
+            <span class="slider-label">1</span>
+            <input type="range" name="helpfulness" min="1" max="3" value="{{ existing.get('helpfulness') or 2 }}" step="1" form="grade-form">
+            <span class="slider-label">3</span>
+          </div>
+        </div>
+
+        <!-- Comments -->
+        <div class="grade-card">
+          <label>Additional comments</label>
+          <textarea name="comments" placeholder="Optional notes..." form="grade-form">{{ existing.get('comments', '') }}</textarea>
+        </div>
+      </div>
+
+      <div class="sidebar-actions">
+        <form method="POST" action="/evaluate" id="skip-form" style="display:inline;">
+          <input type="hidden" name="action" value="skip">
+          <button type="submit" class="btn btn-skip">Skip</button>
+        </form>
+        <form method="POST" action="/evaluate" id="grade-form" style="display:inline;">
+          <input type="hidden" name="action" value="save">
+          <button type="submit" class="btn btn-save">Save</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const raw = {{ response | tojson }};
+  const el = document.getElementById('response-body');
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function renderMarkdown(text) {
+    const lines = text.split('\n');
+    let html = '';
+    let listType = null;
+
+    function closeList() {
+      if (listType) { html += '</' + listType + '>'; listType = null; }
+    }
+
+    for (let line of lines) {
+      const trimmed = line.trim();
+
+      if (trimmed.startsWith('### ')) {
+        closeList();
+        html += '<p><strong>' + escapeHtml(trimmed.slice(4)) + '</strong></p>';
+      } else if (trimmed.startsWith('## ')) {
+        closeList();
+        html += '<p><strong>' + escapeHtml(trimmed.slice(3)) + '</strong></p>';
+      } else if (/^\*\*(.+)\*\*:?$/.test(trimmed)) {
+        closeList();
+        html += '<p><strong>' + escapeHtml(trimmed.replace(/^\*\*|\*\*:?$/g, '')) + '</strong></p>';
+      } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        if (listType !== 'ul') { closeList(); html += '<ul>'; listType = 'ul'; }
+        html += '<li>' + formatInline(trimmed.slice(2)) + '</li>';
+      } else if (/^\d+\.\s/.test(trimmed)) {
+        if (listType !== 'ol') { closeList(); html += '<ol>'; listType = 'ol'; }
+        html += '<li>' + formatInline(trimmed.replace(/^\d+\.\s/, '')) + '</li>';
+      } else if (trimmed === '') {
+        closeList();
+      } else {
+        closeList();
+        html += '<p>' + formatInline(trimmed) + '</p>';
+      }
+    }
+    closeList();
+    return html;
+  }
+
+  function formatInline(text) {
+    const escaped = escapeHtml(text);
+    return escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  }
+
+  el.innerHTML = renderMarkdown(raw);
+
+  // Thumbs up/down toggle
+  function setFactual(value) {
+    const input = document.getElementById('factual-input');
+    const current = input.value;
+    const btns = document.querySelectorAll('.thumb-btn');
+    btns.forEach(b => { b.classList.remove('selected-yes', 'selected-no'); });
+    if (current === value) {
+      input.value = '';
+    } else {
+      input.value = value;
+      if (value === 'yes') btns[0].classList.add('selected-yes');
+      else btns[1].classList.add('selected-no');
+    }
+  }
+
+  // Close info popup when clicking outside
+  document.addEventListener('click', function(e) {
+    const popup = document.querySelector('.info-popup');
+    const icon = document.querySelector('.info-icon');
+    if (popup && !popup.contains(e.target) && !icon.contains(e.target)) {
+      popup.classList.remove('visible');
+    }
+  });
+</script>
+
+{% elif page == "done" %}
+<!-- ==================== DONE ==================== -->
+<div class="done-container">
+  <h1>🎉 All done, {{ evaluator }}!</h1>
+  <p>Thank you for evaluating all prompts.</p>
+  <p>Results saved to:</p>
+  <code>{{ csv_path }}</code>
+  <br>
+  <a href="/" class="restart-btn">Start New Evaluation</a>
+</div>
+
+{% endif %}
+
+</body>
+</html>
